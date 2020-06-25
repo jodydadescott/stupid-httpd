@@ -1,0 +1,2 @@
+#!/bin/bash
+docker run -it jodydadescott/three-stooges:latest bash
