@@ -1,7 +1,7 @@
 package main
 
 import (
-	"stupid-http/server"
+	"stupid-httpd/server"
 )
 
 func main() {
