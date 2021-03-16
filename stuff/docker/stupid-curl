@@ -1,0 +1,27 @@
+#!/bin/bash
+################################################################################
+#
+# Name: stupid-curl
+#
+# Desc: Curl wrapper that taks a single arg (remote host) and makes a single
+# connection attempt and waits for a single second for a response. This is
+# useful for testing security policies.
+#
+################################################################################
+
+main() {
+  rhost=$1
+  rc=0
+  [[ $rhost ]] || { err "Usage:$0 remote_host"; return 2; }
+  curl -s --fail --connect-timeout 1 --retry 0 $rhost > /dev/null 2>&1 && {
+    err "$rhost successful"
+  } || {
+    err "$rhost failed"
+    rc=2
+  }
+  return $rc
+}
+
+err() { echo "$@" 1>&2; }
+
+main $@
