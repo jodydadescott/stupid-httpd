@@ -5,88 +5,106 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 
 	"go.uber.org/zap"
 )
 
-// PingReply ...
-type PingReply struct {
-	URLPath  string `json:"urlpath,omitempty"`
-	Method   string `json:"method,omitempty"`
-	ClientIP string `json:"clientip,omitempty"`
+// HTTPRequest ...
+type HTTPRequest struct {
+	Host   string      `json:"host,omitempty"`
+	Method string      `json:"method,omitempty"`
+	URL    *url.URL    `json:"url,omitempty"`
+	Header http.Header `json:"header,omitempty"`
 }
 
-func (c *PingReply) ToString() string {
-	pjson, err := json.Marshal(c)
-	if err != nil {
-		panic(err)
-	}
-	return string(pjson)
-}
-
-// HttpServer ...
-type HttpServer struct {
+// HTTPServer ...
+type HTTPServer struct {
 	s *http.Server
 }
 
 // NewServer ...
-func NewServer(listen string) *HttpServer {
-
-	s := &HttpServer{}
-
-	go func() {
-		s.s = &http.Server{Addr: listen, Handler: s}
-		s.s.ListenAndServe()
-	}()
+func NewServer() *HTTPServer {
+	zap.L().Debug("NewServer()")
+	s := &HTTPServer{}
 	return s
 }
 
-// Shutdown ...
-func (s *HttpServer) Shutdown() {
-	zap.L().Debug("Shutting down Search Server")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	s.s.Shutdown(ctx)
+// Listen ...
+func (t *HTTPServer) Listen(listen string) error {
+	zap.L().Debug("Listen() / Blocking")
+
+	if t.s != nil {
+		return fmt.Errorf("Duplicate call to Listen")
+	}
+
+	t.s = &http.Server{Addr: listen, Handler: t}
+
+	err := t.s.ListenAndServe()
+	if err != nil {
+		zap.L().Debug("Listen() no longer blocking and returned error")
+		return err
+	}
+
+	zap.L().Debug("Listen() no longer blocking")
+	return nil
 }
 
-// ServeHTTP ...
-func (s *HttpServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+// Shutdown ...
+func (t *HTTPServer) Shutdown() {
+	zap.L().Debug("Shutdown()")
 
-	clientIP := getRemoteIP(req)
-
-	zap.L().Debug(fmt.Sprintf("URLPath: %s, Method: %s, ClientIP: %s", req.URL.Path, req.Method, clientIP))
-
-	switch req.URL.Path {
-	case "/":
-		w.Header().Set("Content-Type", "text/html")
-		fmt.Fprintf(w, "<html>")
-		fmt.Fprintf(w, "<h3>Welcome to the test server; to create a unique connection use the command curl http://"+req.Host+"</h3")
-		fmt.Fprintf(w, "</html>")
+	if t.s == nil {
 		return
 	}
 
-	// By default respond with JSON PingReply
-	w.Header().Set("Content-Type", "application/json")
-
-	pingReply := &PingReply{
-		URLPath:  req.URL.Path,
-		Method:   req.Method,
-		ClientIP: clientIP,
-	}
-	fmt.Fprintf(w, pingReply.ToString()+"\n")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	t.s.Shutdown(ctx)
 }
 
-// if reqHeadersBytes, err := json.Marshal(req.Header); err != nil {
-// 	zap.L().Debug("Could not Marshal Req Headers")
-// } else {
-// 	zap.L().Debug(string(reqHeadersBytes))
-// }
+func pingResponse(r *http.Request) string {
 
-func getRemoteIP(req *http.Request) string {
-	forwarded := req.Header.Get("X-FORWARDED-FOR")
-	if forwarded != "" {
-		return forwarded
+	httpRequest := &HTTPRequest{
+		Host:   r.Host,
+		Method: r.Method,
+		URL:    r.URL,
+		Header: r.Header,
 	}
-	return req.RemoteAddr
+
+	b, _ := json.Marshal(httpRequest)
+	return string(b)
+}
+
+// ServeHTTP ...
+func (t *HTTPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	j := pingResponse(r)
+	zap.L().Debug(fmt.Sprintf("ServeHTTP(http.ResponseWriter, *http.Request=%s)", j))
+
+	switch r.URL.Path {
+
+	case "/":
+		w.Header().Set("Content-Type", "text/html")
+		fmt.Fprintf(w, "<html>")
+		fmt.Fprintf(w, "<h3>Welcome to the test server</h3>")
+		fmt.Fprintf(w, "<a>All operations (GET, POST, PATCH, HEAD, PUT) are supported</p>")
+		fmt.Fprintf(w, "<a href=\"http://"+r.Host+"/\">"+"http://"+r.Host+"/</a> is what you are looking at now</p>")
+		fmt.Fprintf(w, "<a href=\"http://"+r.Host+"/info\">"+"http://"+r.Host+"/info</a> will return a JSON object with details about the request</p>")
+		fmt.Fprintf(w, "<a>All other paths will print the path and operation")
+		fmt.Fprintf(w, "</html>")
+		return
+
+	case "/info":
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, j)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, "<html>")
+	fmt.Fprintf(w, "<a>Path: "+r.URL.Path+"</p>")
+	fmt.Fprintf(w, "<a>Operation/Method: "+r.Method+"</p>")
+	fmt.Fprintf(w, "</html>")
 }

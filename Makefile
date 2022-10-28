@@ -1,29 +1,11 @@
 default:
-	$(MAKE) all
-
-windows:
-	mkdir -p dist/windows
-	env GOOS=windows GOARCH=amd64 go build -o dist/windows/stupid-http.exe main.go
-
-linux:
-	mkdir -p dist/linux
-	env GOOS=linux GOARCH=amd64 go build -o dist/linux/stupid-http main.go
-
-darwin:
-	mkdir -p dist/darwin
-	env GOOS=darwin GOARCH=amd64 go build -o dist/darwin/stupid-http main.go
-
-docker:
-	$(MAKE) linux
-	rm -rf dist/docker
-	cp -r stuff/docker dist
-	cp dist/linux/stupid-http dist/docker
-	cd dist/docker && $(MAKE)
-
-push:
-	cd dist/docker && $(MAKE) push
+	@echo "Make what? (all, clean)"
+	exit 2
 
 all:
-	$(MAKE) windows
-	$(MAKE) darwin
-	$(MAKE) linux
+	cd build && $(MAKE) all
+	cd docker && $(MAKE) all
+
+clean:
+	cd build && $(MAKE) clean
+	cd docker && $(MAKE) clean

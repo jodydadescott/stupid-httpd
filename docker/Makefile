@@ -1,14 +1,12 @@
-BUILD_NUMBER := latest
-PROJECT_NAME := three-stooges
-DOCKER_REGISTRY := jodydadescott
-DOCKER_IMAGE_NAME?=$(PROJECT_NAME)
-DOCKER_IMAGE_TAG?=$(BUILD_NUMBER)
+default:
+	@echo "Make what? (all, clean, push)"
+	exit 2
 
-build:
-	docker build -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) .
-	echo '#!/bin/bash' > shell
-	echo "docker run -it $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG) bash" >> shell
-	chmod +x shell
+all:
+	@ cd linux-amd64 && $(MAKE) build
+
+clean:
+	@ cd linux-amd64 && $(MAKE) clean
 
 push:
-	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)
+	@ cd linux-amd64 && $(MAKE) push
